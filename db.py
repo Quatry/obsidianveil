@@ -35,6 +35,17 @@ def init_db():
         )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS agreements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER,
+        username TEXT,
+        offer_type TEXT,
+        offer_version TEXT,
+        accepted_at TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -163,6 +174,7 @@ def get_expired_subscriptions():
     conn.close()
     return result
 
+
 def update_last_invoice_time(tg_id: int):
     conn = sqlite3.connect("bot.db")
     cur = conn.cursor()
@@ -205,3 +217,20 @@ def get_user_subscription_end(tg_id: int) -> datetime:
     if result and result[0]:
         return datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S")
     return None
+
+
+def save_agreement(tg_id, username, offer_type, offer_version="v1"):
+    conn = sqlite3.connect("bot.db")
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO agreements (tg_id, username, offer_type, offer_version, accepted_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        tg_id,
+        username,
+        offer_type,
+        offer_version,
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ))
+    conn.commit()
+    conn.close()

@@ -1,8 +1,8 @@
-from . import start, info, payment, subscription
+from . import start, payment, subscription, admin
 
 routers = [
     start.router,
     payment.router,
     subscription.router,
-    info.router
+    admin.router
 ]

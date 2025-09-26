@@ -12,4 +12,6 @@ PRIVATE_GROUP_CHAT_ID = int(os.getenv("PRIVATE_GROUP_CHAT_ID", 0))
 
 PUBLIC_GROUP_URL = os.getenv("PUBLIC_GROUP_URL")
 
+BLOG_URL = os.getenv("BLOG_URL")
+
 ADMIN_URL = os.getenv("ADMIN_URL")

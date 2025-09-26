@@ -3,7 +3,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.bot import DefaultBotProperties
 import config
 from handlers import routers
-from scheduler import start_scheduler  # импорт твоей функции шедулера
+from scheduler import start_scheduler
 
 
 async def main():
