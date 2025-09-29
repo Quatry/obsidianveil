@@ -78,7 +78,7 @@ async def diagnostics_offer_handler(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "accept_diagnostics_offer")
 async def accept_diagnostics_offer(callback: CallbackQuery):
     await callback.message.edit_text(
-        text="✅ Вы согласились с офертой.\n\nНажмите на кнопку ниже, чтобы записаться на диагностику:",
+        text="✅ Вы согласились с офертой.\n\nИсполнитель услуг\nЛегенкина Полина Анатольевна\n\nНажмите на кнопку ниже, чтобы записаться на диагностику:",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="📅 Записаться", url=config.ADMIN_URL)],
