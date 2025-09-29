@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 
@@ -11,7 +12,7 @@ from handlers.shared import offer_text
 from keyboards import main_menu, offer_menu, subscription_menu, diagnostics_offer_menu
 
 router = Router()
-
+logger = logging.getLogger(__name__)
 # Антиспам по кликам (в памяти процесса)
 _last_click: dict[int, float] = {}
 

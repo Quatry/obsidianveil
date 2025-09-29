@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from datetime import datetime, timedelta
 
@@ -10,6 +11,7 @@ import config
 import db
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 @router.pre_checkout_query()
@@ -22,21 +24,18 @@ async def successful_payment_handler(message: Message, bot: Bot):
     payload = message.successful_payment.invoice_payload
     user_id = message.from_user.id
     username = message.from_user.username or message.from_user.first_name
-
-    # Уже в группе?
     in_group = db.is_user_in_group(user_id)
 
-    # Срок подписки
     days = 30 if payload == "month_subscription" else 365
     new_end = db.add_or_update_user(user_id, days=days, username=username, in_group=in_group)
 
-    # Красивое форматирование даты
     months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября',
               'декабря']
     formatted_date = f"{new_end.day} {months[new_end.month - 1]} {new_end.year} года в {new_end.strftime('%H:%M')}"
 
+    logger.info(f"Успешная оплата от {username or user_id}, payload={payload}")
+
     if not in_group:
-        # Генерируем одноразовую пригласительную ссылку (живёт 1 день, member_limit=1)
         try:
             token = secrets.token_urlsafe(6)
             invite = await bot.create_chat_invite_link(
@@ -47,11 +46,7 @@ async def successful_payment_handler(message: Message, bot: Bot):
             )
             invite_link = invite.invite_link
 
-            # Помечаем, что пользователь «в группе», чтобы не генерить новые инвайты при следующей оплате,
-            # и сохраняем ссылку (опционально, если у тебя есть функция)
             db.set_user_in_group(user_id, True)
-            # если есть db.save_invite_link — можешь сохранить:
-            # db.save_invite_link(user_id, invite_link)
 
             await message.answer(
                 "✅ Оплата прошла успешно! Подписка активирована.\n\n"
