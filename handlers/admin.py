@@ -1,6 +1,7 @@
 import sqlite3
 import csv
 from aiogram import Router
+from aiogram.filters import Command
 from aiogram.types import Message, FSInputFile
 import config
 
@@ -27,3 +28,9 @@ async def agreements_handler(message: Message):
 
     file = FSInputFile(filename)
     await message.answer_document(file, caption="📑 Список акцептов оферт")
+
+
+@router.message(Command("get_id"))
+async def get_id_handler(message: Message):
+    chat_id = message.chat.id
+    await message.answer(f"ID этой группы: {chat_id}")

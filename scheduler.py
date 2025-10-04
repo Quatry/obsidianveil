@@ -19,16 +19,13 @@ async def check_subscriptions(bot: Bot):
             tg_id = user[0]
             username = user[1]
 
-            is_self = tg_id == ADMIN_ID
-
             db.set_user_in_group(tg_id, False)
 
-            if not is_self:
-                try:
-                    await bot.ban_chat_member(PRIVATE_GROUP_CHAT_ID, tg_id)
-                    await bot.unban_chat_member(PRIVATE_GROUP_CHAT_ID, tg_id)
-                except Exception as e:
-                    print(f"Ошибка при кике пользователя {username}: {e}")
+            try:
+                await bot.ban_chat_member(PRIVATE_GROUP_CHAT_ID, tg_id)
+                await bot.unban_chat_member(PRIVATE_GROUP_CHAT_ID, tg_id)
+            except Exception as e:
+                print(f"Ошибка при кике пользователя {username}: {e}")
 
             try:
                 renew_keyboard = InlineKeyboardMarkup(
@@ -48,10 +45,8 @@ async def check_subscriptions(bot: Bot):
                 print(f"Уведомление отправлено пользователю {username} (ID: {tg_id})")
 
             except Exception as e:
-                # Если не удалось отправить сообщение
                 print(f"Не удалось уведомить пользователя {username}: {e}")
 
-            # Отправляем уведомление администратору
             if ADMIN_ID:
                 await bot.send_message(
                     ADMIN_ID,
@@ -70,4 +65,4 @@ async def start_scheduler(bot: Bot):
     """Запускает периодическую проверку подписок"""
     while True:
         await check_subscriptions(bot)
-        await asyncio.sleep(10)  # для теста, в бою 6*3600
+        await asyncio.sleep(10)

@@ -2,7 +2,6 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import PUBLIC_GROUP_URL, ADMIN_URL, BLOG_URL
 
-# Главное меню
 main_menu = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="Присоединиться к закрытой группе", callback_data="buy_subscription")],
@@ -22,15 +21,13 @@ diagnostics_offer_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="↩️ Назад", callback_data="back_main")]
 ])
 
-# --- Выбор тарифа ---
 subscription_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="1 месяц — 350 руб", callback_data="buy_month")],
-    [InlineKeyboardButton(text="1 год — 4000 руб", callback_data="buy_year")],
+    [InlineKeyboardButton(text="1 год — 3000 руб", callback_data="buy_year")],
     [InlineKeyboardButton(text="↩️ Назад", callback_data="back_offer")]
 ])
 
 
-# Кнопка оплаты (динамически создаётся в хендлере)
 def payment_keyboard(url: str):
     return InlineKeyboardMarkup(
         inline_keyboard=[
