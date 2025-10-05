@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import logging
+import secrets
+
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
 from aiogram.filters import Command
@@ -215,28 +219,86 @@ async def handle_admin_decision(callback: CallbackQuery):
         else "❌ Оплата отклонена. Пользователь уведомлён."
     )
 
-    # Оставляем кнопки, не удаляя "Перейти к пользователю"
+    # обновляем сообщение у админа
     await callback.message.edit_caption(
         caption=callback.message.caption + f"\n\n🧾 Статус: {'✅ Подтверждён' if approved else '❌ Отклонён'}",
         reply_markup=callback.message.reply_markup
     )
 
-    # Уведомляем пользователя
+    # уведомляем пользователя
     pending = db.get_payment(pid)
     if pending:
         uid = pending["tg_id"]
+        username = pending.get("username") or str(uid)
+        plan = pending["plan"]
+
         if approved:
-            await callback.bot.send_message(
-                uid,
-                "✨ Ваш платёж подтверждён. Спасибо!\n"
-                "Мастер свяжется с вами в ближайшее время.",
-                reply_markup=menu_keyboard
-            )
+            if plan == "subscription":
+                # по аналогии с payment.py
+                days = 30  # можно доработать: хранить срок тарифа в pending
+                in_group = db.is_user_in_group(uid)
+                new_end = db.add_or_update_user(uid, days=days, username=username, in_group=in_group)
+
+                months = [
+                    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+                ]
+                formatted_date = f"{new_end.day} {months[new_end.month - 1]} {new_end.year} года в {new_end.strftime('%H:%M')}"
+
+                if not in_group:
+                    try:
+                        token = secrets.token_urlsafe(6)
+                        invite = await callback.bot.create_chat_invite_link(
+                            chat_id=config.PRIVATE_GROUP_CHAT_ID,
+                            name=f"invite_{uid}_{token}",
+                            expire_date=int((datetime.utcnow() + timedelta(days=1)).timestamp()),
+                            member_limit=1,
+                        )
+                        invite_link = invite.invite_link
+                        db.set_user_in_group(uid, True)
+
+                        await callback.bot.send_message(
+                            uid,
+                            f"✅ Подписка активирована!\n\n"
+                            f"🎉 Ваша ссылка для вступления в закрытую группу:\n{invite_link}\n\n"
+                            f"📅 Подписка активна до: {formatted_date}",
+                            reply_markup=menu_keyboard
+                        )
+
+                        if config.ADMIN_ID:
+                            await callback.bot.send_message(
+                                config.ADMIN_ID,
+                                f"💰 Подтверждён платёж от @{username} (ID: {uid})\n"
+                                f"📦 Подписка\n"
+                                f"📅 До: {formatted_date}\n"
+                                f"🔗 Ссылка: {invite_link}"
+                            )
+
+                    except Exception as e:
+                        await callback.bot.send_message(
+                            uid,
+                            "✅ Оплата подтверждена, но не удалось создать ссылку. Свяжитесь с Мастером.",
+                            reply_markup=support_keyboard
+                        )
+                        logger.error(f"Ошибка генерации ссылки для {uid}: {e}")
+                else:
+                    await callback.bot.send_message(
+                        uid,
+                        f"✅ Подписка продлена!\n\n📅 Новая дата окончания: {formatted_date}",
+                        reply_markup=menu_keyboard
+                    )
+
+            elif plan in ["consultation", "amulet"]:
+                await callback.bot.send_message(
+                    uid,
+                    "✨ Ваш платёж подтверждён. Спасибо!\n"
+                    "Мастер свяжется с вами в ближайшее время.",
+                    reply_markup=menu_keyboard
+                )
         else:
             await callback.bot.send_message(
                 uid,
-                "❌ Ваш платёж не подтверждён.\n"
-                "Пожалуйста, свяжитесь с Мастером.",
+                "❌ Ваш платёж не подтверждён.\nПожалуйста, свяжитесь с Мастером.",
                 reply_markup=support_keyboard
             )
 
