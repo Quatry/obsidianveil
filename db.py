@@ -66,11 +66,8 @@ def init_db():
     conn.close()
 
 
-
 def add_or_update_user(tg_id: int, days: int = 30, username: str | None = None, in_group: bool = False):
     """Добавляет или продлевает подписку; возвращает datetime object новой даты окончания."""
-    from datetime import datetime, timedelta
-
     conn = _conn()
     cur = conn.cursor()
 
@@ -131,7 +128,6 @@ def get_user_subscription_end(tg_id: int):
     r = cur.fetchone()
     conn.close()
     if r and r[0]:
-        from datetime import datetime
         return datetime.strptime(r[0], "%Y-%m-%d %H:%M:%S")
     return None
 
@@ -176,14 +172,8 @@ def mark_user_notified_1_day(tg_id: int):
     conn.close()
 
 
-
 def create_pending_payment(tg_id: int, username: str | None, plan: str, amount: int) -> int:
-    """
-    Создаёт (или обновляет существующий) pending payment.
-    plan: 'month' or 'year'
-    amount: в копейках (35000)
-    Возвращает id записи.
-    """
+    """Создаёт (или обновляет существующий) pending payment."""
     conn = _conn()
     cur = conn.cursor()
 
@@ -239,7 +229,8 @@ def get_pending_by_id(pid: int) -> Optional[dict]:
 def set_pending_proof(payment_id: int, file_id: str):
     conn = _conn()
     cur = conn.cursor()
-    cur.execute("UPDATE pending_payments SET proof_file_id = ?, status = 'awaiting_review' WHERE id = ?", (file_id, payment_id))
+    cur.execute("UPDATE pending_payments SET proof_file_id = ?, status = 'awaiting_review' WHERE id = ?",
+                (file_id, payment_id))
     conn.commit()
     conn.close()
 
@@ -247,7 +238,8 @@ def set_pending_proof(payment_id: int, file_id: str):
 def set_pending_status(payment_id: int, status: str, admin_id: int | None = None, admin_note: str | None = None):
     conn = _conn()
     cur = conn.cursor()
-    cur.execute("UPDATE pending_payments SET status = ?, admin_id = ?, admin_note = ? WHERE id = ?", (status, admin_id, admin_note, payment_id))
+    cur.execute("UPDATE pending_payments SET status = ?, admin_id = ?, admin_note = ? WHERE id = ?",
+                (status, admin_id, admin_note, payment_id))
     conn.commit()
     conn.close()
 
@@ -258,7 +250,6 @@ def delete_pending_by_user(tg_id: int):
     cur.execute("DELETE FROM pending_payments WHERE tg_id = ? AND status IN ('pending','awaiting_review')", (tg_id,))
     conn.commit()
     conn.close()
-
 
 
 def save_agreement(tg_id: int, username: str | None, offer_type: str, offer_version: str = "v1"):
@@ -272,10 +263,48 @@ def save_agreement(tg_id: int, username: str | None, offer_type: str, offer_vers
     conn.close()
 
 
-
 def save_invite_link(tg_id: int, invite_link: str):
     conn = _conn()
     cur = conn.cursor()
     cur.execute("INSERT INTO invite_links (tg_id, invite_link) VALUES (?, ?)", (tg_id, invite_link))
     conn.commit()
     conn.close()
+
+
+# ===== Логика для чеков и платежей =====
+
+_receipt_waiting: dict[int, dict[str, str]] = {}
+
+
+def set_receipt_waiting(user_id: int, pid: str | None, plan: str | None = None):
+    """
+    Устанавливает, что пользователь ожидает прикрепления чека.
+    Если pid=None — снимает ожидание.
+    """
+    global _receipt_waiting
+    if pid is None:
+        _receipt_waiting.pop(user_id, None)
+    else:
+        _receipt_waiting[user_id] = {"pid": pid, "plan": plan}
+
+
+def get_receipt_waiting(user_id: int) -> dict | None:
+    """
+    Возвращает данные pending заявки, для которой пользователь должен прикрепить чек.
+    """
+    return _receipt_waiting.get(user_id)
+
+
+def save_receipt_file(pid: int, file_id: str):
+    """Сохраняет file_id чека и переводит заявку в статус 'awaiting_review'"""
+    set_pending_proof(pid, file_id)
+
+
+def set_payment_status(pid: int, status: str):
+    """Меняет статус pending payment на approved/rejected"""
+    set_pending_status(pid, status)
+
+
+def get_payment(pid: int) -> Optional[dict]:
+    """Возвращает информацию о pending payment по id"""
+    return get_pending_by_id(pid)
