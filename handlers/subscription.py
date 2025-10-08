@@ -68,15 +68,18 @@ async def accept_offer(callback: CallbackQuery):
         service = "subscription"
 
     if service == "subscription":
-        await safe_edit_or_send(callback, subscription_text, subscription_menu)
+        await callback.message.edit_text(text=subscription_text, reply_markup=subscription_menu)
+        await callback.answer()
         return
 
     if service == "consultation":
-        await safe_edit_or_send(callback, consultation_text, consultation_menu)
+        await callback.message.edit_text(text=consultation_text, reply_markup=consultation_menu)
+        await callback.answer()
         return
 
     if service == "amulet":
-        await safe_edit_or_send(callback, amulet_text, amulet_menu)
+        await callback.message.edit_text(text=amulet_text, reply_markup=amulet_menu)
+        await callback.answer()
         return
 
 
@@ -108,17 +111,21 @@ async def create_pending_handler(callback: CallbackQuery):
         "🔹 Сбербанк: <b>40817810403005867172</b>\n"
         "🔹 Альфа: <b>40817810805614823674</b>\n\n"
         "После оплаты:\n"
-        "1️⃣ Нажмите «📎 Прикрепить чек» и отправьте фото или скриншот.\n"
-        "2️⃣ Укажите номер телефона и электронную почту.\n"
-        "3️⃣ После подтверждения оплаты Мастер активирует доступ в закрытую группу на выбранный срок."
+        "1️⃣ Нажмите «📎 Прикрепить чек» и отправьте фото или скриншот\n"
+        "2️⃣ Затем укажите номер телефона и электронную почту\n\n"
+        "⚠️ <b>Не переходите в главное меню до завершения процесса</b>"
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📎 Прикрепить чек", callback_data=f"attach_receipt:{pid}")],
-        [InlineKeyboardButton(text="↩️ Назад", callback_data="back_main")]
+        [InlineKeyboardButton(text="↩️ Назад", callback_data="back_offer")]
     ])
 
-    await callback.message.answer(text=text, reply_markup=kb)
+    try:
+        await callback.message.edit_text(text=text, reply_markup=kb)
+    except Exception:
+        await callback.message.answer(text=text, reply_markup=kb)
+
     await callback.answer("Заявка создана — прикрепите чек.")
 
 
@@ -133,12 +140,18 @@ async def attach_receipt_prompt(callback: CallbackQuery):
 
     db.set_receipt_waiting(callback.from_user.id, pid)
 
-    await callback.message.answer(
-        "📎 Пожалуйста, отправьте фото или документ с чеком.\n\n"
-        "❗ Только изображение или файл — текстовые сообщения не принимаются."
-    )
-    await callback.answer()
+    try:
+        await callback.message.edit_text(
+            "📎 Пожалуйста, отправьте фото или документ с чеком.\n\n"
+            "❗ Только изображение или файл — текстовые сообщения не принимаются."
+        )
+    except Exception:
+        await callback.message.answer(
+            "📎 Пожалуйста, отправьте фото или документ с чеком.\n\n"
+            "❗ Только изображение или файл — текстовые сообщения не принимаются."
+        )
 
+    await callback.answer()
 
 # === Этап 5. Приём фото или документа от пользователя ===
 @router.message(F.photo | F.document)
