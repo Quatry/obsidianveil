@@ -24,7 +24,9 @@ offer_menu = InlineKeyboardMarkup(
 subscription_menu = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="1 месяц — 500 руб", callback_data="create_pending:subscription:50000")],
-        [InlineKeyboardButton(text="3 месяца — 3000 руб", callback_data="create_pending:subscription:300000")],
+        [InlineKeyboardButton(text="3 месяца — 1200 руб", callback_data="create_pending:subscription:120000")],
+        [InlineKeyboardButton(text="6 месяцев — 2200 руб", callback_data="create_pending:subscription:220000")],
+        [InlineKeyboardButton(text="12 месяцев — 4000 руб", callback_data="create_pending:subscription:400000")],
         [InlineKeyboardButton(text="↩️ Назад", callback_data="back_offer")]
     ]
 )
@@ -32,7 +34,10 @@ subscription_menu = InlineKeyboardMarkup(
 # Меню консультации
 consultation_menu = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text="Консультация — 5000 руб", callback_data="buy_consultation_pay")],
+        [InlineKeyboardButton(text="Краткая диагностика — 1700 руб",
+                              callback_data="create_pending:consultation:170000")],
+        [InlineKeyboardButton(text="Полный разбор — 7000 руб",
+                              callback_data="create_pending:consultation:700000")],
         [InlineKeyboardButton(text="↩️ Назад", callback_data="back_main")]
     ]
 )
@@ -40,7 +45,7 @@ consultation_menu = InlineKeyboardMarkup(
 # Меню амулетов
 amulet_menu = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text="Амулет — 2500 руб", callback_data="buy_amulet_pay")],
+        [InlineKeyboardButton(text="Амулет — 15000 руб", callback_data="create_pending:amulet:1500000")],
         [InlineKeyboardButton(text="↩️ Назад", callback_data="back_main")]
     ]
 )

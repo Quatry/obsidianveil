@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 
 import logging
@@ -11,8 +12,8 @@ from aiogram.filters import Command
 
 import db
 import config
-from handlers.shared import offer_text
-from keyboards import main_menu, subscription_menu, support_keyboard, menu_keyboard
+from handlers.shared import offer_text, months, consultation_text, amulet_text, subscription_text
+from keyboards import main_menu, subscription_menu, support_keyboard, menu_keyboard, consultation_menu, amulet_menu
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -67,34 +68,15 @@ async def accept_offer(callback: CallbackQuery):
         service = "subscription"
 
     if service == "subscription":
-        await safe_edit_or_send(callback, "Выберите тариф подписки:", subscription_menu)
+        await safe_edit_or_send(callback, subscription_text, subscription_menu)
         return
 
     if service == "consultation":
-        text = (
-            "🧘 Консультация — индивидуальная работа с вами, разбор ситуации и рекомендации.\n\n"
-            "💰 Стоимость: <b>5000 руб</b>.\n\n"
-            "После оплаты прикрепите чек — Мастер свяжется с вами для назначения времени."
-        )
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Оплатить консультацию — 5000 руб",
-                                  callback_data="create_pending:consultation:500000")],
-            [InlineKeyboardButton(text="↩️ Назад", callback_data="back_main")]
-        ])
-        await safe_edit_or_send(callback, text, kb)
+        await safe_edit_or_send(callback, consultation_text, consultation_menu)
         return
 
     if service == "amulet":
-        text = (
-            "🔮 Амулет изготавливается индивидуально под вас.\n\n"
-            "💰 Стоимость: <b>2500 руб</b>.\n\n"
-            "После оплаты прикрепите чек — мастер свяжется с вами для уточнения деталей."
-        )
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💎 Купить амулет — 2500 руб", callback_data="create_pending:amulet:250000")],
-            [InlineKeyboardButton(text="↩️ Назад", callback_data="back_main")]
-        ])
-        await safe_edit_or_send(callback, text, kb)
+        await safe_edit_or_send(callback, amulet_text, amulet_menu)
         return
 
 
@@ -120,12 +102,15 @@ async def create_pending_handler(callback: CallbackQuery):
 
     rub = amount / 100
     text = (
-        f"💳 <b>Оплата услуги: {plan_text}</b>\n\n"
-        f"💰 Сумма: {rub:.2f} руб.\n\n"
+        f"💳 Оплата услуги: <b>{plan_text}</b>\n\n"
+        f"💰 Сумма: <b>{rub:.2f}</b> руб.\n\n"
         "Реквизиты для перевода:\n"
-        "🔹 Сбербанк: 1234 5678 9876 5432\n"
-        "🔹 Тинькофф: 5555 6666 7777 8888\n\n"
-        "После оплаты нажмите «📎 Прикрепить чек» и отправьте фото/файл."
+        "🔹 Сбербанк: <b>40817810403005867172</b>\n"
+        "🔹 Альфа: <b>40817810805614823674</b>\n\n"
+        "После оплаты:\n"
+        "1️⃣ Нажмите «📎 Прикрепить чек» и отправьте фото или скриншот.\n"
+        "2️⃣ Укажите номер телефона и электронную почту.\n"
+        "3️⃣ После подтверждения оплаты Мастер активирует доступ в закрытую группу на выбранный срок."
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -147,10 +132,10 @@ async def attach_receipt_prompt(callback: CallbackQuery):
         return
 
     db.set_receipt_waiting(callback.from_user.id, pid)
+
     await callback.message.answer(
         "📎 Пожалуйста, отправьте фото или документ с чеком.\n\n"
-        "❗ Только изображение или файл — текстовые сообщения не принимаются.",
-        reply_markup=menu_keyboard
+        "❗ Только изображение или файл — текстовые сообщения не принимаются."
     )
     await callback.answer()
 
@@ -161,54 +146,162 @@ async def handle_receipt_upload(message: Message):
     user_id = message.from_user.id
     pending = db.get_receipt_waiting(user_id)
     if not pending:
-        return  # Игнорируем, если не ждём чек
+        return
 
     pid = pending["pid"]
     plan = pending["plan"]
 
-    # Получаем file_id
     file_id = message.photo[-1].file_id if message.photo else message.document.file_id
 
     db.save_receipt_file(pid, file_id)
     db.set_receipt_waiting(user_id, None)
 
-    # Уведомляем администратора
-    kb_admin = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"approve:{pid}"),
-            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject:{pid}")
-        ],
-        [InlineKeyboardButton(text="💬 Перейти к пользователю", url=f"tg://user?id={user_id}")]
-    ])
-
-    plan_text = (
-        "Консультация" if plan == "consultation"
-        else "Амулет" if plan == "amulet"
-        else "Подписка"
-    )
-
-    await message.bot.send_photo(
-        config.ADMIN_ID,
-        photo=file_id,
-        caption=f"💰 Новый чек по заявке #{pid}\n"
-                f"👤 Пользователь: @{message.from_user.username or message.from_user.first_name}\n"
-                f"💫 Услуга: {plan_text}",
-        reply_markup=kb_admin
-    )
+    # Переходим к сбору контактных данных
+    db.set_contacts_waiting(user_id, pid)
 
     await message.answer(
-        "✅ Чек отправлен. Мастер проверит оплату и свяжется с вами.",
+        "✅ Чек получен! Теперь укажите ваши контактные данные:\n\n"
+        "📱 <b>Номер телефона</b> и 📧 <b>Email</b>\n\n"
+        "Отправьте их в формате:\n"
+        "<code>Телефон: +79991234567\nEmail: example@mail.ru</code>",
+        parse_mode="HTML"
+    )
+
+
+# === Этап 6. Сбор контактных данных ===
+@router.message(F.text)
+async def handle_contacts(message: Message):
+    user_id = message.from_user.id
+    pending = db.get_contacts_waiting(user_id)
+
+    if not pending:
+        return  # Игнорируем текстовые сообщения не в состоянии ожидания контактов
+
+    pid = pending["pid"]
+    text = message.text.strip()
+
+    # Парсим контактные данные
+    phone = None
+    email = None
+
+    lines = text.split('\n')
+    for line in lines:
+        if 'телефон:' in line.lower() or 'phone:' in line.lower():
+            phone = line.split(':', 1)[1].strip()
+        elif 'email:' in line.lower() or 'почта:' in line.lower():
+            email = line.split(':', 1)[1].strip()
+
+    # Если не найдено в структурированном формате, пробуем извлечь из текста
+    if not phone or not email:
+        # Простая валидация email
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        emails = re.findall(email_pattern, text)
+        if emails:
+            email = emails[0]
+
+        # Простая валидация телефона
+        phone_pattern = r'[\+]?[7|8]?[\s]?[\(]?[0-9]{3}[\)]?[\s]?[0-9]{3}[\s]?[0-9]{2}[\s]?[0-9]{2}'
+        phones = re.findall(phone_pattern, text)
+        if phones:
+            phone = phones[0].strip()
+
+    if not phone or not email:
+        await message.answer(
+            "❌ Не удалось распознать контактные данные.\n\n"
+            "Пожалуйста, отправьте в формате:\n"
+            "<code>Телефон: +79991234567\nEmail: example@mail.ru</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    # Сохраняем контактные данные
+    db.update_payment_contacts(pid, phone, email)
+
+    # Сбрасываем состояние ожидания
+    db.clear_user_state(user_id)
+
+    # Уведомляем админа
+    pending_data = db.get_payment(pid)
+    if pending_data and config.ADMIN_ID:
+        plan = pending_data["plan"]
+        amount = pending_data["amount"] / 100
+        username = pending_data.get("username") or str(user_id)
+        plan_text = (
+            "Консультация" if plan == "consultation"
+            else "Амулет" if plan == "amulet"
+            else "Подписка"
+        )
+
+        admin_text = (
+            f"🆕 Новая заявка на оплату #{pid}\n\n"
+            f"👤 Пользователь: @{username} (ID: {user_id})\n"
+            f"📦 Услуга: <b>{plan_text}</b>\n"
+            f"💰 Сумма: <b>{amount:.2f}</b> руб.\n"
+            f"📱 Телефон: <b>{phone}</b>\n"
+            f"📧 Email: <b>{email}</b>\n\n"
+            f"Для подтверждения используйте кнопки ниже:"
+        )
+
+        kb_admin = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"approve:{pid}"),
+                InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject:{pid}")
+            ],
+            [InlineKeyboardButton(text="💬 Перейти к пользователю", url=f"tg://user?id={user_id}")]
+        ])
+
+        # Отправляем чек админу, если есть
+        if pending_data.get("proof_file_id"):
+            try:
+                if pending_data["proof_file_id"].startswith("AgAC"):  # фото
+                    await message.bot.send_photo(
+                        chat_id=config.ADMIN_ID,
+                        photo=pending_data["proof_file_id"],
+                        caption=admin_text,
+                        reply_markup=kb_admin
+                    )
+                else:  # документ
+                    await message.bot.send_document(
+                        chat_id=config.ADMIN_ID,
+                        document=pending_data["proof_file_id"],
+                        caption=admin_text,
+                        reply_markup=kb_admin
+                    )
+            except Exception as e:
+                logger.error(f"Ошибка отправки чека админу: {e}")
+                await message.bot.send_message(
+                    chat_id=config.ADMIN_ID,
+                    text=admin_text + f"\n\n❌ Чек не загружен: {e}",
+                    reply_markup=kb_admin
+                )
+        else:
+            await message.bot.send_message(
+                chat_id=config.ADMIN_ID,
+                text=admin_text,
+                reply_markup=kb_admin
+            )
+
+    await message.answer(
+        "✅ Спасибо! Ваши контактные данные получены.\n\n"
+        "Ожидайте подтверждения оплаты Мастером. Вы получите уведомление, "
+        "когда доступ будет активирован.",
         reply_markup=menu_keyboard
     )
 
 
-# === Этап 6. Подтверждение или отклонение (для администратора) ===
+# === Этап 7. Подтверждение или отклонение (для администратора) ===
 @router.callback_query(F.data.startswith("approve:") | F.data.startswith("reject:"))
 async def handle_admin_decision(callback: CallbackQuery):
     try:
         action, pid = callback.data.split(":", 1)
     except ValueError:
         await callback.answer("Ошибка ID.", show_alert=True)
+        return
+
+    # Проверяем текущий статус платежа
+    pending = db.get_payment(pid)
+    if pending and pending["status"] in ["approved", "rejected"]:
+        await callback.answer("Этот платёж уже обработан.", show_alert=True)
         return
 
     approved = action == "approve"
@@ -219,30 +312,45 @@ async def handle_admin_decision(callback: CallbackQuery):
         else "❌ Оплата отклонена. Пользователь уведомлён."
     )
 
-    # обновляем сообщение у админа
+    # Создаем новую клавиатуру с заблокированными кнопками
+    new_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="✅ Подтверждён",
+                callback_data="already_processed"
+            ) if approved else InlineKeyboardButton(
+                text="❌ Отклонён",
+                callback_data="already_processed"
+            )
+        ],
+        [InlineKeyboardButton(text="💬 Перейти к пользователю", url=f"tg://user?id={pending['tg_id']}")]
+    ])
+
+    # Обновляем сообщение с заблокированными кнопками
     await callback.message.edit_caption(
         caption=callback.message.caption + f"\n\n🧾 Статус: {'✅ Подтверждён' if approved else '❌ Отклонён'}",
-        reply_markup=callback.message.reply_markup
+        reply_markup=new_keyboard
     )
 
-    # уведомляем пользователя
-    pending = db.get_payment(pid)
+    # Остальной код обработки уведомлений пользователя...
     if pending:
         uid = pending["tg_id"]
         username = pending.get("username") or str(uid)
         plan = pending["plan"]
+        amount = pending["amount"]
+        days_map = {
+            50000: 30,
+            120000: 90,
+            220000: 180,
+            400000: 365
+        }
+        days = days_map.get(amount, 30)
 
         if approved:
             if plan == "subscription":
-                # по аналогии с payment.py
-                days = 30  # можно доработать: хранить срок тарифа в pending
                 in_group = db.is_user_in_group(uid)
                 new_end = db.add_or_update_user(uid, days=days, username=username, in_group=in_group)
 
-                months = [
-                    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-                    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
-                ]
                 formatted_date = f"{new_end.day} {months[new_end.month - 1]} {new_end.year} года в {new_end.strftime('%H:%M')}"
 
                 if not in_group:
@@ -304,6 +412,12 @@ async def handle_admin_decision(callback: CallbackQuery):
 
     await callback.answer(text)
     logger.info("Payment %s %s by admin", pid, action)
+
+
+# Обработчик для заблокированных кнопок
+@router.callback_query(F.data == "already_processed")
+async def handle_already_processed(callback: CallbackQuery):
+    await callback.answer("Этот платёж уже обработан.", show_alert=True)
 
 
 # === Кнопки "назад" ===

@@ -308,3 +308,39 @@ def set_payment_status(pid: int, status: str):
 def get_payment(pid: int) -> Optional[dict]:
     """Возвращает информацию о pending payment по id"""
     return get_pending_by_id(pid)
+
+
+_contacts_waiting: dict[int, dict[str, str]] = {}
+
+
+def set_contacts_waiting(user_id: int, pid: str):
+    """Устанавливает состояние ожидания контактных данных"""
+    global _contacts_waiting
+    _contacts_waiting[user_id] = {"pid": pid}
+
+
+def get_contacts_waiting(user_id: int):
+    """Получает информацию об ожидании контактов"""
+    return _contacts_waiting.get(user_id)
+
+
+def update_payment_contacts(pid: int, phone: str, email: str):
+    """Обновляет контактные данные в записи платежа"""
+    conn = _conn()
+    cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE pending_payments ADD COLUMN phone TEXT")
+        cur.execute("ALTER TABLE pending_payments ADD COLUMN email TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+    cur.execute("UPDATE pending_payments SET phone = ?, email = ? WHERE id = ?", (phone, email, pid))
+    conn.commit()
+    conn.close()
+
+
+def clear_user_state(user_id: int):
+    """Очищает состояние пользователя"""
+    global _receipt_waiting, _contacts_waiting
+    _receipt_waiting.pop(user_id, None)
+    _contacts_waiting.pop(user_id, None)

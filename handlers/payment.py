@@ -8,6 +8,7 @@ from aiogram.types import Message, PreCheckoutQuery
 
 import config
 import db
+from handlers.shared import months
 from keyboards import menu_keyboard, support_keyboard
 
 router = Router()
@@ -40,10 +41,6 @@ async def successful_payment_handler(message: Message, bot: Bot):
         in_group = db.is_user_in_group(user_id)
         new_end = db.add_or_update_user(user_id, days=days, username=username, in_group=in_group)
 
-        months = [
-            'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-            'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
-        ]
         formatted_date = f"{new_end.day} {months[new_end.month - 1]} {new_end.year} года в {new_end.strftime('%H:%M')}"
 
         if not in_group:
