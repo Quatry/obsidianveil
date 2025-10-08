@@ -4,13 +4,11 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.bot import DefaultBotProperties
 import config
-import db
 from handlers import routers
 from scheduler import start_scheduler
 
 
 async def main():
-    db.init_db()
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
