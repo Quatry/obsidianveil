@@ -383,8 +383,7 @@ async def handle_admin_decision(callback: CallbackQuery):
                             uid,
                             f"✅ Подписка активирована!\n\n"
                             f"🎉 Ваша ссылка для вступления в закрытую группу:\n{invite_link}\n\n"
-                            f"📅 Подписка активна до: {formatted_date}",
-                            reply_markup=menu_keyboard
+                            f"📅 Подписка активна до: {formatted_date}"
                         )
 
                         if config.ADMIN_ID:
@@ -415,7 +414,6 @@ async def handle_admin_decision(callback: CallbackQuery):
                     uid,
                     "✨ Ваш платёж подтверждён. Спасибо!\n"
                     "Мастер свяжется с вами в ближайшее время.",
-                    reply_markup=menu_keyboard
                 )
         else:
             await callback.bot.send_message(
