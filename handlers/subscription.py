@@ -153,6 +153,7 @@ async def attach_receipt_prompt(callback: CallbackQuery):
 
     await callback.answer()
 
+
 # === Этап 5. Приём фото или документа от пользователя ===
 @router.message(F.photo | F.document)
 async def handle_receipt_upload(message: Message):
@@ -176,7 +177,7 @@ async def handle_receipt_upload(message: Message):
         "✅ Чек получен! Теперь укажите ваши контактные данные:\n\n"
         "📱 <b>Номер телефона</b> и 📧 <b>Email</b>\n\n"
         "Отправьте их в формате:\n"
-        "<code>Телефон: +79991234567\nEmail: example@mail.ru</code>",
+        "<code>+79991234567</code>\n<code>example@mail.ru</code>",
         parse_mode="HTML"
     )
 
@@ -222,7 +223,7 @@ async def handle_contacts(message: Message):
         await message.answer(
             "❌ Не удалось распознать контактные данные.\n\n"
             "Пожалуйста, отправьте в формате:\n"
-            "<code>Телефон: +79991234567\nEmail: example@mail.ru</code>",
+            "<code>+79991234567</code>\n<code>example@mail.ru</code>",
             parse_mode="HTML"
         )
         return
